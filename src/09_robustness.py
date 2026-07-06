@@ -44,7 +44,8 @@ LARGEST_STATES = ["CA", "TX", "FL", "NY", "PA"]  # by population, for the leave-
 def fit_twfe(df: pd.DataFrame, outcome: str, treatment: str, controls: list[str], extra_terms: str = ""):
     needed = [outcome, treatment] + controls
     d = df.dropna(subset=needed).copy()
-    formula = f"{outcome} ~ 1 + {treatment} + " + " + ".join(controls) + extra_terms + " + EntityEffects + TimeEffects"
+    control_terms = "".join(f" + {c}" for c in controls)
+    formula = f"{outcome} ~ 1 + {treatment}" + control_terms + extra_terms + " + EntityEffects + TimeEffects"
     d = d.set_index(["state", "year"])
     res = PanelOLS.from_formula(formula, data=d).fit(cov_type="clustered", cluster_entity=True)
     return res, len(d)
@@ -89,11 +90,11 @@ def main() -> None:
 
     # 3. Leave-one-state-out.
     loo_betas = {}
-    for state in config.STATE_ABBRS:
-        sub = panel[panel["state"] != state]
+    for dropped_state in config.STATE_ABBRS:
+        sub = panel[panel["state"] != dropped_state]
         try:
             res, n = fit_twfe(sub, "obesity_pct", TREATMENT, CONTROLS)
-            loo_betas[state] = res.params[TREATMENT]
+            loo_betas[dropped_state] = res.params[TREATMENT]
         except Exception:
             continue
     loo_series = pd.Series(loo_betas)
@@ -125,14 +126,29 @@ def main() -> None:
     rows.append({"check": "Drop all controls (TWFE only)", "beta": res.params[TREATMENT],
                  "se": res.std_errors[TREATMENT], "n": n, "note": "column (3) from Phase 6, for reference"})
 
-    # 5b. State-specific linear trends.
+    # 5b. State-specific linear trends. Built as explicit named columns
+    # (trend_<STATE> = trend * 1[state==STATE]) rather than a "C(state):trend"
+    # formula -- patsy/formulaic's C() resolves bare names via the caller's
+    # local variables when they aren't a data column, which is fragile (a
+    # leftover loop variable elsewhere in this function previously shadowed
+    # it silently). Explicit columns have no such ambiguity.
     trend_panel = panel.copy()
     trend_panel["trend"] = trend_panel["year"] - config.YEAR_START
+    trend_cols = []
+    for trend_state in config.STATE_ABBRS:
+        col = f"trend_{trend_state}"
+        trend_panel[col] = trend_panel["trend"] * (trend_panel["state"] == trend_state).astype(float)
+        trend_cols.append(col)
     try:
         d = trend_panel.dropna(subset=["obesity_pct", TREATMENT] + CONTROLS).set_index(["state", "year"])
-        formula = (f"obesity_pct ~ 1 + {TREATMENT} + " + " + ".join(CONTROLS) +
-                   " + C(state):trend + EntityEffects + TimeEffects")
-        res = PanelOLS.from_formula(formula, data=d).fit(cov_type="clustered", cluster_entity=True)
+        formula = (f"obesity_pct ~ 1 + {TREATMENT} + " + " + ".join(CONTROLS + trend_cols) +
+                   " + EntityEffects + TimeEffects")
+        # One state's trend column is collinear with the year effects + the
+        # other states' trends combined (a standard rank-deficiency with a
+        # full set of state trends alongside year FE) -- drop_absorbed lets
+        # linearmodels drop that one redundant column instead of erroring.
+        res = PanelOLS.from_formula(formula, data=d, drop_absorbed=True).fit(
+            cov_type="clustered", cluster_entity=True)
         rows.append({"check": "+ state-specific linear trends", "beta": res.params[TREATMENT],
                      "se": res.std_errors[TREATMENT], "n": int(res.nobs),
                      "note": "each state gets its own linear time trend on top of TWFE"})

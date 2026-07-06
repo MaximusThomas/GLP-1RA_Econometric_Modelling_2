@@ -93,6 +93,11 @@ def main() -> None:
         panel = panel.merge(df, on=["state", "year"], how="left")
         assert len(panel) == before, f"merge with {name} changed row count -- duplicate keys in source"
 
+    # A state-year with zero raw SDUD rows (no GLP-1 records at all -- e.g.
+    # ME 2020) is a genuine zero, not a missing value, so fill before
+    # computing ratios (otherwise 0/population would wrongly become NaN).
+    panel["glp1_prescriptions"] = panel["glp1_prescriptions"].fillna(0)
+
     # Treatment intensity measures.
     # Primary: per 1,000 Medicaid enrollees (only defined 2016-2022, the
     # enrollment series' coverage window -- see README for why).
@@ -101,7 +106,6 @@ def main() -> None:
     # coverage), since SDUD's numerator is Medicaid-only but the denominator
     # here is not, this is a cross-check on relative uptake, not a rate.
     panel["glp1_per_1000_pop"] = 1000 * panel["glp1_prescriptions"] / panel["population"]
-    panel["glp1_prescriptions"] = panel["glp1_prescriptions"].fillna(0)
 
     panel["log_income_pc"] = np.log(panel["income_pc_real"])
     panel["log_population"] = np.log(panel["population"])

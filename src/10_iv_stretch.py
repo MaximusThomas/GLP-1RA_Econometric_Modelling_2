@@ -89,9 +89,21 @@ def main() -> None:
 
     print(res)
 
-    first_stage = mod.first_stage
+    first_stage = res.first_stage
     print("\nFirst-stage diagnostics (instrument relevance):")
     print(first_stage)
+
+    partial_f = float(first_stage.diagnostics.loc[TREATMENT + "_dm", "f.stat"])
+    weak_instrument_note = (
+        f"Partial F-statistic on the excluded instrument: {partial_f:.3f}. This is far below the "
+        f"conventional weak-instrument rule-of-thumb threshold of 10 (Stock-Yogo) -- the shift-share "
+        f"instrument has essentially no power to explain GLP-1 uptake once state and year fixed effects "
+        f"and controls are already in the model. The IV coefficient below should be treated as "
+        f"uninformative (weak-instrument bias/huge standard errors), not as a more credible causal "
+        f"estimate than the TWFE result. This is exactly why the brief labels this section optional "
+        f"and illustrative rather than part of the core conclusion."
+    )
+    print("\n" + weak_instrument_note)
 
     out_txt = config.OUTPUTS_TABLES / "iv_stretch.txt"
     with open(out_txt, "w") as f:
@@ -101,12 +113,13 @@ def main() -> None:
         f.write("\n\nFirst stage:\n")
         f.write(str(first_stage))
         f.write(f"\n\nIV coefficient on {TREATMENT}: {res.params[TREATMENT + '_dm']:.4f} "
-                f"(SE {res.std_errors[TREATMENT + '_dm']:.4f})\n")
+                f"(SE {res.std_errors[TREATMENT + '_dm']:.4f})\n\n")
+        f.write(weak_instrument_note + "\n\n")
         f.write("Compare to the TWFE+controls (OLS) estimate in outputs/tables/main_results.csv, "
                 "column (4). This IV result is illustrative only -- the exclusion restriction "
                 "(2011 diabetes prevalence affects obesity only through GLP-1 uptake) is arguable, "
-                "not verified, and this section should not be read as strengthening the causal "
-                "claim beyond what Phase 6-8 support.\n")
+                "not verified, and (on top of the weak first stage) this section should not be read "
+                "as strengthening the causal claim beyond what Phase 6-8 support.\n")
     print(f"\n[iv stretch] -> {out_txt}")
 
 

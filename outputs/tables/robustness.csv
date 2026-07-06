@@ -1,0 +1,12 @@
+check,beta,se,n,note
+"Baseline (main spec, col 4)",-0.007616870979775276,0.012951930455863521,709.0,"per-1,000-population, 2011-2024"
+"Alt treatment: per-1,000 Medicaid enrollees",0.014688543581153913,0.010253843688447813,355.0,restricted to 2016-2022 (enrollment coverage)
+Alt outcome: diabetes prevalence,0.017135994552777558,0.011897874100388596,709.0,GLP-1s are heavily prescribed for diabetes
+Leave-one-state-out (range across 51 runs),-0.0075869372863745345,,50.0,"min=-0.0106 (NJ), max=0.0029 (DC)"
+Drop DC,0.0028835899864387217,0.010117508512809549,695.0,DC is not a state; check it isn't driving results
+Drop 5 largest states,-0.009073305852406116,0.014369640859007174,641.0,"drops ['CA', 'TX', 'FL', 'NY', 'PA']"
+Suppression imputed as 0 (primary rule: 5),-0.007760728778408443,0.012913485810211397,708.0,cf. baseline row for the primary rule's coefficient
+Suppression imputed as 10 (primary rule: 5),-0.008001138263539053,0.013088547364041057,708.0,cf. baseline row for the primary rule's coefficient
+Drop all controls (TWFE only),-0.004134528820421275,0.012266337429078884,709.0,"column (3) from Phase 6, for reference"
++ state-specific linear trends,0.010764678560172474,0.01572950795561645,709.0,each state gets its own linear time trend on top of TWFE
+Wild cluster bootstrap SEs,,,,"not implemented (51 clusters is not a small-cluster problem; flagged as a possible extension, see module docstring)"

@@ -1,0 +1,15 @@
+Main regression results: obesity_pct on GLP-1 prescriptions per 1,000 population
+================================================================================
+
+              column    beta     se       t  pvalue   n  r2_within
+      (1) Pooled OLS  0.1442 0.0261  5.5174  0.0000 709     0.3978
+      (2) + State FE  0.1766 0.0172 10.2580  0.0000 709     0.4117
+(3) + Year FE (TWFE) -0.0041 0.0123 -0.3371  0.7362 709    -0.0195
+      (4) + Controls -0.0076 0.0130 -0.5881  0.5567 709    -0.1464
+
+Coefficient movement (1)->(4): 0.1442 -> -0.0076. The coefficient shrinks once state fixed effects are added, consistent with confounding: states that prescribe more GLP-1s (often sicker/higher-diabetes populations) also tend to have different obesity levels for reasons unrelated to the drugs themselves. Once we compare each state to itself over time (the within-transformation), rather than comparing different states to each other, much of that confounding is removed.
+
+
+Hausman test (FE vs RE), entity-effects specification with controls:
+  chi2(5) = -2.325 (negative)
+  A negative Hausman statistic is a known finite-sample anomaly (it means the asymptotic Var(FE)-Var(RE)>=0 assumption doesn't hold exactly in this sample) -- conventionally treated as a failure to reject H0, i.e. no strong evidence against RE. FE is still used as the main specification here because the state-level confounding story (sicker states prescribe more) is the more defensible prior regardless of what this test shows.

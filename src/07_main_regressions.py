@@ -79,6 +79,15 @@ def hausman_test(df: pd.DataFrame) -> str:
     try:
         stat = diff @ np.linalg.inv(var_diff) @ diff
         df_ = len(common)
+        if stat < 0:
+            return (f"Hausman test (FE vs RE), entity-effects specification with controls:\n"
+                    f"  chi2({df_}) = {stat:.3f} (negative)\n"
+                    f"  A negative Hausman statistic is a known finite-sample anomaly (it means the "
+                    f"asymptotic Var(FE)-Var(RE)>=0 assumption doesn't hold exactly in this sample) -- "
+                    f"conventionally treated as a failure to reject H0, i.e. no strong evidence against "
+                    f"RE. FE is still used as the main specification here because the state-level "
+                    f"confounding story (sicker states prescribe more) is the more defensible prior "
+                    f"regardless of what this test shows.\n")
         pval = 1 - stats.chi2.cdf(stat, df_)
         verdict = (
             "Reject H0 (p<0.05): systematic difference between FE and RE -> FE is preferred "
