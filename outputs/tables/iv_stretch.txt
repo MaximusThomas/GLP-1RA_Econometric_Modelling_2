@@ -7,7 +7,7 @@ Dep. Variable:         obesity_pct_dm   R-squared:                     -0.0945
 Estimator:                    IV-2SLS   Adj. R-squared:                -0.1007
 No. Observations:                 709   F-statistic:                    1.8774
 Date:                Mon, Jul 06 2026   P-value (F-stat)                0.7583
-Time:                        14:37:21   Distribution:                  chi2(4)
+Time:                        14:40:47   Distribution:                  chi2(4)
 Cov. Estimator:             clustered                                         
                                                                               
                                   Parameter Estimates                                   

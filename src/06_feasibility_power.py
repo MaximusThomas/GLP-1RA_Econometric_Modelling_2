@@ -136,14 +136,16 @@ def main() -> None:
 
     print(content)
 
-    findings_path = config.REPORT_DIR / "findings.md"
-    existing = findings_path.read_text() if findings_path.exists() else "# Findings\n\n"
-    marker = "## Phase 4: Feasibility and power check"
-    if marker in existing:
-        head = existing.split(marker)[0]
-        existing = head
-    findings_path.write_text(existing.rstrip() + "\n\n" + content)
-    print(f"\n[feasibility] appended to {findings_path}")
+    # Written to its own file rather than appended to report/findings.md:
+    # findings.md is the hand-assembled final write-up (Phase 10), and this
+    # script needs to be safely re-runnable on its own (e.g. after a panel
+    # rebuild) without silently mutating or duplicating content in that
+    # polished document. The numbers here are copied into findings.md's
+    # feasibility section by Phase 10, not auto-injected.
+    out_path = config.REPORT_DIR / "feasibility_section.md"
+    out_path.write_text(content)
+    print(f"\n[feasibility] written to {out_path} (see report/findings.md §3 for the "
+          f"version incorporated into the final write-up)")
 
 
 if __name__ == "__main__":
