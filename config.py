@@ -5,6 +5,7 @@ Every data-pulling script (src/01-03) imports from here so that the
 year range, state list, and endpoint URLs are defined in exactly one place.
 """
 
+import os
 from pathlib import Path
 
 # --------------------------------------------------------------------------
@@ -32,7 +33,7 @@ YEAR_END = 2024
 YEARS = list(range(YEAR_START, YEAR_END + 1))
 
 # 50 states + DC. Postal abbreviation -> (full name, 2-digit FIPS code).
-# FIPS codes are needed to build BLS LAUS series IDs.
+# FIPS codes are needed to join the Census population/age-structure files.
 STATES = {
     "AL": ("Alabama", "01"), "AK": ("Alaska", "02"), "AZ": ("Arizona", "04"),
     "AR": ("Arkansas", "05"), "CA": ("California", "06"), "CO": ("Colorado", "08"),
@@ -123,44 +124,46 @@ MEDICAID_ENROLLMENT_CSV = "https://download.medicaid.gov/data/ProgramType-anul.c
 CENSUS_POP_2010_2020 = "https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/state/totals/nst-est2020-alldata.csv"
 CENSUS_POP_2020_2024 = "https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/state/totals/NST-EST2024-ALLDATA.csv"
 
-# Census age structure (65+ share, median age), bulk CSV, no API key.
-CENSUS_AGE_2010_2020 = "https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/state/asrh/PRC-EST2020-AGESEX.csv"
+# Census age structure (65+ share), bulk CSV, no API key. Single-year-of-age
+# by state/sex, AGE==999 is the all-ages total, AGE 65-85 (85=85+ top code)
+# sums to the 65+ population. SEX==0 is both sexes combined.
+CENSUS_AGE_2010_2020 = "https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/state/asrh/SC-EST2020-AGESEX-CIV.csv"
 CENSUS_AGE_2020_2024 = "https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/state/asrh/sc-est2024-agesex-civ.csv"
 
-# BLS LAUS state unemployment rate (public API v2, keyless at this request
-# volume: 25 series/day limit applies without a registered key -- we query
-# all 51 states in state-sized batches with a pause between batches).
-# Series ID pattern: LASST + 2-digit FIPS + 0000000000 + 03 (unemployment rate).
-BLS_API_ENDPOINT = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+# FRED (economic controls): real personal income per capita and state
+# unemployment rate, as specified in the project brief. Requires a free API
+# key -- read from the FRED_API_KEY environment variable (see .env.example).
+# Series ID patterns confirmed live: "{state}PCPI" (nominal per capita
+# personal income, annual, $) and "{state}UR" (unemployment rate, annual avg
+# computed from the monthly series). CPIAUCNS is used to deflate nominal
+# income to real terms (base year = last year in the panel, YEAR_END).
+FRED_API_ENDPOINT = "https://api.stlouisfed.org/fred/series/observations"
 
-def bls_series_id(fips: str) -> str:
-    return f"LASST{fips}0000000000003"
 
-# Census SAIPE median household income, per-state fixed-width text files
-# (no API key). Record layout confirmed from:
-# https://www2.census.gov/programs-surveys/saipe/technical-documentation/file-layouts/state-county/2019-estimate-layout.txt
-# Median household income estimate occupies characters 134-139 (1-indexed).
-SAIPE_MHI_COLSPEC = (133, 139)  # 0-indexed, end-exclusive
+def _load_env_file(path: Path) -> None:
+    """Minimal .env loader (avoids adding python-dotenv as a dependency)."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip())
 
-def saipe_url(year: int, state_abbr: str) -> str:
-    yy = f"{year % 100:02d}"
-    return (
-        f"https://www2.census.gov/programs-surveys/saipe/datasets/{year}/"
-        f"{year}-state-and-county/est{yy}-{state_abbr.lower()}.txt"
-    )
 
-# --------------------------------------------------------------------------
-# FRED substitution note (see README / report/findings.md for full writeup):
-# The project brief specifies FRED for real personal income per capita and
-# unemployment rate. FRED requires a free API key that needs a human to
-# register; none was available in this run. Substitutes used instead,
-# documented here so the choice is explicit and reproducible:
-#   - Unemployment rate:  BLS LAUS public API (keyless) instead of FRED.
-#   - Income:             Census SAIPE median household income (keyless)
-#                          instead of FRED real personal income per capita.
-#                          This is a household-income concept, not per-capita
-#                          personal income -- noted as a limitation.
-# If a FRED key becomes available, swap these two sources for the FRED
-# series and re-run 03_pull_controls.py; the rest of the pipeline is
-# agnostic to which source populated `unemployment_rate` / `log_income_pc`.
-# --------------------------------------------------------------------------
+_load_env_file(ROOT / ".env")
+FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
+
+
+def fred_pcpi_series(state_abbr: str) -> str:
+    """Nominal per capita personal income series ID for a state."""
+    return f"{state_abbr}PCPI"
+
+
+def fred_unemployment_series(state_abbr: str) -> str:
+    """Unemployment rate series ID for a state."""
+    return f"{state_abbr}UR"
+
+
+FRED_CPI_SERIES = "CPIAUCNS"  # CPI-U, not seasonally adjusted, for deflating income
